@@ -55,12 +55,6 @@ void checkRFID(MFRC522 &rfidReader, const char* doorName) {
   }
 }
 bool checkAccess(MFRC522::Uid uid, const char* doorName) {
-  // UID baytlarını tek bir tamsayı değerine dönüştür
-  unsigned long cardUID = 0;
-  for (byte i = 0; i < uid.size; i++) {
-    cardUID <<= 8;
-    cardUID |= uid.uidByte[i];
-  }
   // Dosyayı okumak için aç
   File dbFile = SD.open("access_db.txt");
   if (!dbFile) {
