@@ -1,6 +1,5 @@
 #include <SPI.h>
 #include <MFRC522.h>
-#include <SD.h>
 
 #define RST_PIN1         9          // Ana kapı için RC522 reset pini
 #define SS_PIN1          10         // Ana kapı için RC522 slave select pini
@@ -12,8 +11,6 @@
 #define BUZZER_PIN1      5          // Buzzer pini 1
 #define BUZZER_PIN2      6          // Buzzer pini 2
 #define BUZZER_PIN3      7          // Buzzer pini 3
-
-#define SD_CS_PIN        4          // SD kart modülü CS pini
 
 MFRC522 mfrc522_main(SS_PIN1, RST_PIN1); // MFRC522 örneklerini oluştur
 MFRC522 mfrc522_office(SS_PIN2, RST_PIN2);
@@ -30,11 +27,6 @@ void setup() {
   pinMode(BUZZER_PIN2, OUTPUT);
   pinMode(BUZZER_PIN3, OUTPUT);
 
-  if (!SD.begin(SD_CS_PIN)) {
-    Serial.println("SD Kart başlatma başarısız oldu!");
-    return;
-  }
-  Serial.println("SD Kart başlatıldı.");
   Serial.println("RFID Okuyucuları Başlatıldı!");
 }
 
@@ -51,12 +43,14 @@ void loop() {
 
 void checkRFID(MFRC522 &rfidReader, const char* doorName, int buzzerPin) {
   if (rfidReader.PICC_IsNewCardPresent() && rfidReader.PICC_ReadCardSerial()) {
-    Serial.print("RFID Okuyucu (");
     Serial.print(doorName);
-    Serial.print(") - Okunan UID: ");
+    Serial.print(" kapısı için UID okundu: ");
     printUID(rfidReader.uid);
-    // UID'yi listeye karşı kontrol et
-    if (checkAccess(rfidReader.uid, doorName)) {
+    // UID'yi seri port üzerinden bilgisayara gönder
+    sendUIDToComputer(rfidReader.uid, doorName);
+    // Bilgisayardan erişim izni yanıtını bekle
+    bool accessGranted = waitForAccessResponse();
+    if (accessGranted) {
       Serial.println("Erişim İzni Onaylandı!");
       // Buzzer'ı 1 saniye boyunca aç
       digitalWrite(buzzerPin, HIGH);
@@ -69,41 +63,27 @@ void checkRFID(MFRC522 &rfidReader, const char* doorName, int buzzerPin) {
   }
 }
 
-bool checkAccess(MFRC522::Uid uid, const char* doorName) {
-  // Dosyayı okumak için aç
-  File dbFile = SD.open("access_db.txt");
-  if (!dbFile) {
-    Serial.println("Veritabanı dosyasını açarken hata");
-    return false;
+void sendUIDToComputer(MFRC522::Uid uid, const char* doorName) {
+  // UID'yi seri monitöre yazdır
+  for (byte i = 0; i < uid.size; i++) {
+    Serial.print(uid.uidByte[i] < 0x10 ? " 0" : " ");
+    Serial.print(uid.uidByte[i], HEX);
   }
-  // Dosyayı satır satır oku
-  char dbLine[128];
-  while (dbFile.available()) {
-    dbFile.readBytesUntil('\n', dbLine, sizeof(dbLine));
-    // Satırı ayrıştır ve UID'nin eşleşip eşleşmediğini kontrol et
-    // ve doğru erişim izinlerine sahip olup olmadığını kontrol et
-    char* token = strtok(dbLine, ",");
-    if (token && atol(token) == cardUID) {
-      // UID bulundu, şimdi erişim izinlerini kontrol et
-      while (token) {
-        token = strtok(NULL, ",");
-        if (token && strcmp(token, doorName) == 0) {
-          // Kapı adını buldu, erişim iznini kontrol et
-          token = strtok(NULL, ",");
-          if (token && atoi(token) == 1) {
-            // Erişim izni verildi
-            dbFile.close();
-            return true;
-          }
-        }
-      }
-    }
-  }
-  // Dosyayı kapat
-  dbFile.close();
-  // Eğer UID bulunamazsa, erişimi reddet
-  return false;
+  Serial.print(","); // UID ve kapı adı arasında ayırıcı olarak virgül kullan
+  Serial.println(doorName); // Kapı adını gönder
 }
+
+bool waitForAccessResponse() {
+  // Bilgisayardan yanıt gelene kadar bekle
+  while (!Serial.available()) {
+    delay(100);
+  }
+  // Bilgisayardan gelen yanıtı oku
+  String response = Serial.readStringUntil('\n');
+  response.trim(); // Başındaki ve sonundaki boşlukları temizle
+  return response.equals("1"); // Eğer yanıt "1" ise erişim izni verilmiş demektir
+}
+
 void printUID(MFRC522::Uid uid) {
   // UID'yi seri monitöre yazdır
   for (byte i = 0; i < uid.size; i++) {
