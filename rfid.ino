@@ -1,46 +1,85 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define RST_PIN         9   // Example reset pin
-#define SS_PIN          10  // Example slave select pin
-#define BUZZER_PIN      5   // Buzzer pin
+#define RST_PIN1         9          // Main door RC522 reset pin
+#define SS_PIN1          10         // Main door RC522 slave select pin
+#define RST_PIN2         8          // Office door RC522 reset pin
+#define SS_PIN2          11         // Office door RC522 slave select pin
+#define RST_PIN3         6          // DJ room door RC522 reset pin
+#define SS_PIN3          2          // DJ room RC522 slave select pin
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
+#define BUZZER_PIN1      5          // Buzzer pin 1
+#define BUZZER_PIN2      6          // Buzzer pin 2
+#define BUZZER_PIN3      7          // Buzzer pin 3
+
+MFRC522 mfrc522_main(SS_PIN1, RST_PIN1);   // Create MFRC522 instance for main door
+MFRC522 mfrc522_office(SS_PIN2, RST_PIN2); // Create MFRC522 instance for office door
+MFRC522 mfrc522_djroom(SS_PIN3, RST_PIN3); // Create MFRC522 instance for DJ room door
 
 void setup() {
-  Serial.begin(9600); // Start serial communication
-  SPI.begin();        // Start SPI bus
-  mfrc522.PCD_Init(); // Initialize MFRC522
+  Serial.begin(9600);   // Start serial communication
+  SPI.begin();          // Start SPI bus
+  mfrc522_main.PCD_Init();   // Initialize MFRC522 for main door
+  mfrc522_office.PCD_Init(); // Initialize MFRC522 for office door
+  mfrc522_djroom.PCD_Init(); // Initialize MFRC522 for DJ room door
 
-  pinMode(BUZZER_PIN, OUTPUT); // Set buzzer pin as OUTPUT
-  Serial.println("RFID Reader Initialized!");
+  pinMode(BUZZER_PIN1, OUTPUT); // Set buzzer pin for main door as OUTPUT
+  pinMode(BUZZER_PIN2, OUTPUT); // Set buzzer pin for office door as OUTPUT
+  pinMode(BUZZER_PIN3, OUTPUT); // Set buzzer pin for DJ room as OUTPUT
+
+  Serial.println("RFID Readers Initialized!");
 }
 
 void loop() {
-  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-    sendUIDToComputer(mfrc522.uid); // Send UID to server
-    mfrc522.PICC_HaltA();           // Stop reading
+  // Check each RFID reader
+  checkRFID(mfrc522_main, "Main Door", BUZZER_PIN1);
+  checkRFID(mfrc522_office, "Office Door", BUZZER_PIN2);
+  checkRFID(mfrc522_djroom, "DJ Room", BUZZER_PIN3);
 
-    if (waitForAccessResponse()) {
-      digitalWrite(BUZZER_PIN, HIGH); // Access granted, turn on buzzer
-      delay(1000);                    // Buzzer on for 1 second
-      digitalWrite(BUZZER_PIN, LOW);  // Turn off buzzer
+  delay(1000); // Wait a second before reading the next card
+}
+
+void checkRFID(MFRC522 &rfidReader, const char* doorName, int buzzerPin) {
+  if (rfidReader.PICC_IsNewCardPresent() && rfidReader.PICC_ReadCardSerial()) {
+    Serial.print(doorName);
+    Serial.print(" door UID read: ");
+    printUID(rfidReader.uid);
+    sendUIDToComputer(rfidReader.uid, doorName);
+    bool accessGranted = waitForAccessResponse();
+    if (accessGranted) {
+      Serial.println("Access Granted!");
+      digitalWrite(buzzerPin, HIGH);
+      delay(1000);
+      digitalWrite(buzzerPin, LOW);
+    } else {
+      Serial.println("Access Denied!");
     }
-    delay(1000); // Wait for a second before next read
+    rfidReader.PICC_HaltA();  // Stop reading
   }
 }
 
-void sendUIDToComputer(MFRC522::Uid uid) {
+void sendUIDToComputer(MFRC522::Uid uid, const char* doorName) {
   for (byte i = 0; i < uid.size; i++) {
     Serial.print(uid.uidByte[i] < 0x10 ? " 0" : " ");
     Serial.print(uid.uidByte[i], HEX);
   }
-  Serial.println(); // End of UID
+  Serial.print(","); // Use comma as separator between UID and door name
+  Serial.println(doorName); // Send door name
 }
 
 bool waitForAccessResponse() {
   while (!Serial.available()) {
-    delay(100); // Wait for a response
+    delay(100);
   }
-  return Serial.read() == '1'; // Assuming '1' means access granted
+  String response = Serial.readStringUntil('\n');
+  response.trim();
+  return response.equals("1"); // If response is "1" then access is granted
+}
+
+void printUID(MFRC522::Uid uid) {
+  for (byte i = 0; i < uid.size; i++) {
+    Serial.print(uid.uidByte[i] < 0x10 ? " 0" : " ");
+    Serial.print(uid.uidByte[i], HEX);
+  }
+  Serial.println();
 }
