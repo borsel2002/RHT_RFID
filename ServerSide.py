@@ -18,7 +18,8 @@ def check_uid_in_database(uid, doorName):
         host=os.getenv('DB_HOST'), 
         user=os.getenv('DB_USER'), 
         password=os.getenv('DB_PASSWORD'),  
-        database=os.getenv('DB_NAME')  
+        database=os.getenv('DB_NAME'),
+        auth_plugin='mysql_native_password'
     )
     c = conn.cursor()
 
