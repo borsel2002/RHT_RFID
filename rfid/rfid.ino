@@ -3,13 +3,13 @@
 
 #define RST_PIN1         9          // Main door RC522 reset pin
 #define SS_PIN1          10         // Main door RC522 slave select pin
-#define RST_PIN2         7          // Office door RC522 reset pin
-#define SS_PIN2          8         // Office door RC522 slave select pin
+#define RST_PIN2         3          // Office door RC522 reset pin
+#define SS_PIN2          4          // Office door RC522 slave select pin
 #define RST_PIN3         5          // DJ room door RC522 reset pin
 #define SS_PIN3          6          // DJ room RC522 slave select pin
 
-#define BUZZER_PIN1      4          // Buzzer pin 1
-#define BUZZER_PIN2      4          // Buzzer pin 2
+#define BUZZER_PIN1      2          // Buzzer pin 1
+#define BUZZER_PIN2      3          // Buzzer pin 2
 #define BUZZER_PIN3      4          // Buzzer pin 3
 
 MFRC522 mfrc522_main(SS_PIN1, RST_PIN1);   // Create MFRC522 instance for main door
