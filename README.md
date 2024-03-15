@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS Assoc_info (
     Assoc_main_Accs BOOLEAN,
     Assoc_office_Accs BOOLEAN,
     Assoc_djroom_Accs BOOLEAN,
-    UID INTEGER,
-    FOREIGN KEY (UID) REFERENCES School_info(UID)
+    Std_ID INTEGER,
+    FOREIGN KEY (Std_ID) REFERENCES School_info(Std_ID)
 );
 
 CREATE TABLE IF NOT EXISTS Personal_info (
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS Personal_info (
     eMail TEXT,
     GSM INTEGER,
     BDay DATE,
-    UID INTEGER,
-    FOREIGN KEY (UID) REFERENCES School_info(UID)
+    Std_ID INTEGER,
+    FOREIGN KEY (Std_ID) REFERENCES School_info(UStd_IDID)
 );
 
