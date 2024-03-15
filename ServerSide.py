@@ -96,24 +96,6 @@ def submit_form():
 root = tk.Tk()
 root.title("Add New User")
 
-# Create form fields
-tk.Label(root, text="UID:").get()
-    assoc_actv = assoc_actv_var.get()
-    assoc_main_accs = assoc_main_accs_var.get()
-    assoc_office_accs = assoc_office_accs_var.get()
-    assoc_djroom_accs = assoc_djroom_accs_var.get()
-    first_name = first_name_entry.get()
-    last_name = last_name_entry.get()
-    email = email_entry.get()
-    gsm = int(gsm_entry.get())
-    bday = bday_entry.get()
-
-    insert_into_database(uid, std_dep, std_term, assoc_affil, assoc_dep, assoc_actv, assoc_main_accs, assoc_office_accs, assoc_djroom_accs, first_name, last_name, email, gsm, bday)
-
-# Create the main window
-root = tk.Tk()
-root.title("Add New User")
-
 # Create form elements
 uid_label = tk.Label(root, text="UID:")
 uid_label.grid(row=0, column=0)
