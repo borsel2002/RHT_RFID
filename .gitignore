@@ -38,6 +38,7 @@ logs/
 # Local development
 .env
 instance/
+migrations/versions/__pycache__/
 
 # Database
 *.sqlite
@@ -46,6 +47,14 @@ instance/
 # Generated files
 static/qrcodes/
 access_db.txt
+
+# Project specific
+migrations/versions/
+migrations/script.py.mako
+migrations/alembic.ini
+migrations/env.py
+migrations/README
+migrations/sqlalchemy-migrate.ini
 
 # OS specific
 .DS_Store
