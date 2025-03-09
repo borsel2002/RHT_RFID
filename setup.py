@@ -1,0 +1,31 @@
+from setuptools import setup, find_packages
+
+setup(
+    name='rht_rfid',
+    version='1.0.0',
+    packages=find_packages(),
+    include_package_data=True,
+    install_requires=[
+        'Flask==3.0.0',
+        'Flask-SQLAlchemy==3.1.1',
+        'Flask-Login==0.6.3',
+        'Flask-WTF==1.2.1',
+        'Flask-Mail==0.9.1',
+        'Flask-Migrate==4.0.5',
+        'Flask-Caching==2.1.0',
+        'Flask-QRcode==3.1.0',
+        'Flask-Security-Too==5.3.2',
+        'mysqlclient==2.2.1',
+        'SQLAlchemy==2.0.25',
+        'PyJWT==2.8.0',
+        'pyotp==2.9.0',
+        'python-dotenv==1.0.0',
+        'redis==5.0.1',
+        'bcrypt==4.1.2',
+        'qrcode==7.4.2',
+        'Pillow==10.2.0',
+        'gunicorn==21.2.0',
+        'sentry-sdk==1.39.1',
+        'python-json-logger==2.0.7',
+    ],
+)

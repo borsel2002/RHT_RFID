@@ -1,0 +1,720 @@
+Combine the folowing in one python file:
+database_operations.py:
+```
+import pymysql
+from pymysql.err import OperationalError
+
+class DatabaseOperations:
+    def __init__(self, host, user, password, database):
+        self.host = host
+        self.user = user
+        self.password = password
+        self.database = database
+        self.connection = None
+
+    def connect(self):
+        try:
+            self.connection = pymysql.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                db=self.database,
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            print("Database connection successful.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def disconnect(self):
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+            print("Database connection closed.")
+        else:
+            print("No database connection to close.")
+
+    def execute_query(self, query, data=None):
+        try:
+            with self.connection.cursor() as cursor:
+                if data:
+                    cursor.execute(query, data)
+                else:
+                    cursor.execute(query)
+                self.connection.commit()
+                print("Query executed successfully.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def fetch_data(self, query, data=None):
+        try:
+            with self.connection.cursor() as cursor:
+                if data:
+                    cursor.execute(query, data)
+                else:
+                    cursor.execute(query)
+                result = cursor.fetchall()
+                return result
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def create_tables(self):
+        if not self.connection or not self.connection.open:
+            print("The database connection was not successful. Please check your connection settings.")
+            return
+
+        create_school_info_table = """
+        CREATE TABLE IF NOT EXISTS School_info (
+            Std_ID INT PRIMARY KEY,
+            Std_Dep VARCHAR(255),
+            Std_Term VARCHAR(255),
+            UID INT
+        );
+        """
+        create_assoc_info_table = """
+        CREATE TABLE IF NOT EXISTS Assoc_info (
+            Assoc_Affil BOOLEAN,
+            Assoc_Dep VARCHAR(255),
+            Assoc_Actv BOOLEAN,
+            Assoc_main_Accs BOOLEAN,
+            Assoc_office_Accs BOOLEAN,
+            Assoc_djroom_Accs BOOLEAN,
+            Std_ID INT,
+            PRIMARY KEY (Std_ID),
+            FOREIGN KEY (Std_ID) REFERENCES School_info(Std_ID)
+        );
+        """
+        create_personal_info_table = """
+        CREATE TABLE IF NOT EXISTS Personal_info (
+            FirstName VARCHAR(255),
+            LastName VARCHAR(255),
+            eMail VARCHAR(255),
+            GSM VARCHAR(255),
+            BDay DATE,
+            Std_ID INT,
+            PRIMARY KEY (Std_ID),
+            FOREIGN KEY (Std_ID) REFERENCES School_info(Std_ID)
+        );
+        """
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(create_school_info_table)
+                cursor.execute(create_assoc_info_table)
+                cursor.execute(create_personal_info_table)
+                self.connection.commit()
+                print("Tables created successfully.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+```
+
+
+serial_communication.py:
+```
+import serial
+import time
+
+class SerialCommunication:
+    def __init__(self, port, baudrate):
+        self.port = port
+        self.baudrate = baudrate
+        self.ser = None
+
+    def connect(self):
+        try:
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
+            print(f"Connected to serial port {self.port} at {self.baudrate} baud")
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def disconnect(self):
+        if self.ser:
+            self.ser.close()
+            print(f"Disconnected from serial port {self.port}")
+        else:
+            print("No serial port to disconnect from.")
+
+    def send_data(self, data):
+        try:
+            if self.ser:
+                self.ser.write(data.encode())
+                print(f"Data sent: {data}")
+            else:
+                print("No serial port to send data to.")
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def receive_data(self, timeout=1):
+        try:
+            if self.ser:
+                self.ser.timeout = timeout
+                data = self.ser.readline().decode().strip()
+                return data
+            else:
+                return None
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def read_data_until(self, expected_data, timeout=1):
+        if self.ser:
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                data = self.receive_data()
+                if data == expected_data:
+                    return data
+            return None
+        else:
+            return None
+
+def recieve_uid(ser):
+    global uid
+    global doorName
+    while True:
+        data = ser.read_data_until(None, timeout=1)
+        if data:
+            uid, doorName = data.split(',')
+            if uid:
+                break
+```
+lookup_tab.py:
+```
+import tkinter as tk
+from tkinter import ttk
+import pymysql.err
+
+class LookupTab(tk.Frame):
+    def __init__(self, parent, db_operations, serial_communication):
+        super().__init__(parent)
+        self.db_operations = db_operations
+        self.serial_communication = serial_communication
+        self.create_widgets()
+
+    def init_ui(self):
+        try:
+            # Create a frame for the search bar and buttons
+            search_frame = ttk.Frame(self.root)
+            search_frame.pack(fill=tk.X, padx=10, pady=10)
+
+            # Create a search bar
+            ttk.Label(search_frame, text="Search query:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
+            self.search_query = tk.StringVar()
+            ttk.Entry(search_frame, textvariable=self.search_query, width=30).grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+            # Create a search button
+            ttk.Button(search_frame, text="Search", command=self.search).grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+            # Create a frame for the search results
+            results_frame = ttk.Frame(self.root)
+            results_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+            # Create a treeview widget to display the search results
+            self.tree = ttk.Treeview(results_frame, columns=("ID", "Name", "Email", "Phone"), show="headings")
+            self.tree.heading("ID", text="ID")
+            self.tree.heading("Name", text="Name")
+            self.tree.heading("Email", text="Email")
+            self.tree.heading("Phone", text="Phone")
+            self.tree.pack(fill=tk.BOTH, expand=True)
+
+            # Populate the treeview widget with sample data
+            self.db_operations.connect()
+            try:
+                data = self.db_operations.fetch_data("SELECT * FROM contacts")
+                for row in data:
+                    self.tree.insert("", "end", values=row)
+            except pymysql.err.ProgrammingError as e:
+                print(f"The error '{e}' occurred")
+            self.db_operations.disconnect()
+        except Exception as e:
+            print(f"The error '{e}' occurred")
+
+    def search(self):
+        try:
+            # Connect to the database
+            self.db_operations.connect()
+
+            # Execute the search query using a parameterized query
+            query = "SELECT * FROM contacts WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s"
+            data = (f"%{self.search_query.get()}%", f"%{self.search_query.get()}%", f"%{self.search_query.get()}%")
+            results = self.db_operations.fetch_data(query, data)
+
+            # Clear the treeview widget
+            self.tree.delete(*self.tree.get_children())
+
+            # Populate the treeview widget with the search results
+            for row in results:
+                self.tree.insert("", "end", values=row)
+
+            # Disconnect from the database
+            self.db_operations.disconnect()
+        except pymysql.err.ProgrammingError as e:
+            print(f"The error '{e}' occurred")
+        except Exception as e:
+            print(f"The error '{e}' occurred")
+```
+add_tab.py:
+```
+import tkinter as tk
+from tkinter import ttk
+import serial_communication
+import pymysql
+import pymysql.err
+import os
+from tkinter import messagebox
+
+class AddTab:
+    def __init__(self, parent, db_operations, serial_communication):
+        self.parent = parent
+        self.db_operations = db_operations
+        self.serial_communication = serial_communication
+
+        self.frame = ttk.Frame(parent)
+        self.frame.pack(padx=10, pady=10)
+
+        self.name_label = ttk.Label(self.frame, text="Name:")
+        self.name_label.grid(row=0, column=0, padx=5, pady=5)
+        self.name_entry = ttk.Entry(self.frame)
+        self.name_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        self.age_label = ttk.Label(self.frame, text="Age:")
+        self.age_label.grid(row=1, column=0, padx=5, pady=5)
+        self.age_entry = ttk.Entry(self.frame)
+        self.age_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        self.add_button = ttk.Button(self.frame, text="Add", command=self.submit_form)
+        self.add_button.grid(row=2, column=0, padx=5, pady=5)
+
+        self.uid_label = ttk.Label(self.frame, text="UID:")
+        self.uid_label.grid(row=2, column=1, padx=5, pady=5)
+        self.uid_entry = ttk.Entry(self.frame, state="readonly")
+        self.uid_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.uid_var = ttk.StringVar()
+
+def create_form():
+    # Create the form
+    form = ttk.Frame(root)
+    form.grid(row=0, column=0, padx=10, pady=10)
+
+    # Create the form fields
+    std_id_label = ttk.Label(form, text="Student ID:")
+    std_id_entry = ttk.Entry(form)
+    std_dep_label = ttk.Label(form, text="Student Department:")
+    std_dep_entry = ttk.Entry(form)
+    std_term_label = ttk.Label(form, text="Student Term:")
+    std_term_entry = ttk.Entry(form)
+    assoc_affil_label = ttk.Label(form, text="Association Affiliation:")
+    assoc_affil_var = tk.StringVar()
+    assoc_affil_entry = ttk.Combobox(form, textvariable=assoc_affil_var)
+    assoc_affil_entry['values'] = ('Affiliate', 'Non-Affiliate')
+    assoc_dep_label = ttk.Label(form, text="Association Department:")
+    assoc_dep_entry = ttk.Entry(form)
+    assoc_actv_label = ttk.Label(form, text="Association Activity:")
+    assoc_actv_var = tk.StringVar()
+    assoc_actv_entry = ttk.Combobox(form, textvariable=assoc_actv_var)
+    assoc_actv_entry['values'] = ('Active', 'Inactive')
+    assoc_main_accs_label = ttk.Label(form, text="Association Main Access:")
+    assoc_main_accs_var = tk.StringVar()
+    assoc_main_accs_entry = ttk.Combobox(form, textvariable=assoc_main_accs_var)
+    assoc_main_accs_entry['values'] = ('Yes', 'No')
+    assoc_office_accs_label = ttk.Label(form, text="Association Office Access:")
+    assoc_office_accs_var = tk.StringVar()
+    assoc_office_accs_entry = ttk.Combobox(form, textvariable=assoc_office_accs_var)
+    assoc_office_accs_entry['values'] = ('Yes', 'No')
+    assoc_djroom_accs_label = ttk.Label(form, text="Association DJ Room Access:")
+    assoc_djroom_accs_var = tk.StringVar()
+    assoc_djroom_accs_entry = ttk.Combobox(form, textvariable=assoc_djroom_accs_var)
+    assoc_djroom_accs_entry['values'] = ('Yes', 'No')
+    first_name_label = ttk.Label(form, text="First Name:")
+    first_name_entry = ttk.Entry(form)
+    last_name_label = ttk.Label(form, text="Last Name:")
+    last_name_entry = ttk.Entry(form)
+    email_label = ttk.Label(form, text="Email:")
+    email_entry = ttk.Entry(form)
+    gsm_label = ttk.Label(form, text="GSM:")
+    gsm_entry = ttk.Entry(form)
+    bday_label = ttk.Label(form, text="Birthday:")
+    bday_entry = ttk.Entry(form)
+    uid_label = ttk.Label(form, text="UID:")
+    uid_var = tk.StringVar()
+    uid_entry = ttk.Entry(form, textvariable=uid_var, state='readonly')
+
+    # Create the submit button
+    submit_button = ttk.Button(form, text="Submit", command=lambda: submit_form(std_id_entry, std_dep_entry, std_term_entry, assoc_affil_var, assoc_dep_entry, assoc_actv_var, assoc_main_accs_var, assoc_office_accs_var, assoc_djroom_accs_var, first_name_entry, last_name_entry, email_entry, gsm_entry, bday_entry, uid_var, serial_communication))
+
+    # Grid the form fields
+    std_id_label.grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
+    std_id_entry.grid(row=0, column=1, padx=5, pady=5)
+    std_dep_label.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+    std_dep_entry.grid(row=1, column=1, padx=5, pady=5)
+    std_term_label.grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+    std_term_entry.grid(row=2, column=1, padx=5, pady=5)
+    assoc_affil_label.grid(row=3, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_affil_entry.grid(row=3, column=1, padx=5, pady=5)
+    assoc_dep_label.grid(row=4, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_dep_entry.grid(row=4, column=1, padx=5, pady=5)
+    assoc_actv_label.grid(row=5, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_actv_entry.grid(row=5, column=1, padx=5, pady=5)
+    assoc_main_accs_label.grid(row=6, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_main_accs_entry.grid(row=6, column=1, padx=5, pady=5)
+    assoc_office_accs_label.grid(row=7, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_office_accs_entry.grid(row=7, column=1, padx=5, pady=5)
+    assoc_djroom_accs_label.grid(row=8, column=0, padx=5, pady=5, sticky=tk.W)
+    assoc_djroom_accs_entry.grid(row=8, column=1, padx=5, pady=5)
+    first_name_label.grid(row=9, column=0, padx=5, pady=5, sticky=tk.W)
+    first_name_entry.grid(row=9, column=1, padx=5, pady=5)
+    last_name_label.grid(row=10, column=0, padx=5, pady=5, sticky=tk.W)
+    last_name_entry.grid(row=10, column=1, padx=5, pady=5)
+    email_label.grid(row=11, column=0, padx=5, pady=5, sticky=tk.W)
+    email_entry.grid(row=11, column=1, padx=5, pady=5)
+    gsm_label.grid(row=12, column=0, padx=5, pady=5, sticky=tk.W)
+    gsm_entry.grid(row=12, column=1, padx=5, pady=5)
+    bday_label.grid(row=13, column=0, padx=5, pady=5, sticky=tk.W)
+    bday_entry.grid(row=13, column=1, padx=5, pady=5)
+    uid_label.grid(row=14, column=0, padx=5, pady=5, sticky=tk.W)
+    uid_entry.grid(row=14, column=1, padx=5, pady=5)
+    submit_button.grid(row=15, column=0, columnspan=2, padx=5, pady=5)
+
+    return form
+
+def submit_form(std_id_entry, std_dep_entry, std_term_entry, assoc_affil_var, assoc_dep_entry, assoc_actv_var, assoc_main_accs_var, assoc_office_accs_var, assoc_djroom_accs_var, first_name_entry, last_name_entry, email_entry, gsm_entry, bday_entry, uid_var, serial_communication):    # Get the input values
+    std_id = std_id_entry.get()
+    std_dep = std_dep_entry.get()
+    std_term = std_term_entry.get()
+    assoc_affil = assoc_affil_var.get()
+    assoc_dep = assoc_dep_entry.get()
+    assoc_actv = assoc_actv_var.get()
+    assoc_main_accs = assoc_main_accs_var.get()
+    assoc_office_accs = assoc_office_accs_var.get()
+    assoc_djroom_accs = assoc_djroom_accs_var.get()
+    first_name = first_name_entry.get()
+    last_name = last_name_entry.get()
+    email = email_entry.get()
+    gsm = gsm_entry.get()
+    bday = bday_entry.get()
+    uid = serial_communication.recieve_uid()
+
+    uid = uid.get()
+    if uid is None:
+        uid = ""  # UID is empty if not received from serial
+    
+
+    # Connect to the database
+    conn = pymysql.connect(
+        host=os.getenv('DB_HOST'), 
+        user=os.getenv('DB_USER'), 
+        password=os.getenv('DB_PASSWORD'),  database=os.getenv('DB_NAME')  
+    )
+    cursor = conn.cursor()
+
+    try:
+        # Insert into School_info
+        cursor.execute("INSERT INTO School_info (Std_ID, Std_Dep, Std_Term, UID) VALUES (%s, %s, %s, %s)", (std_id, std_dep, std_term, uid))
+
+        # Insert into Assoc_info
+        cursor.execute("INSERT INTO Assoc_info (Assoc_Affil, Assoc_Dep, Assoc_Actv, Assoc_main_Accs, Assoc_office_Accs, Assoc_djroom_Accs, Std_ID) VALUES (%s, %s, %s, %s, %s, %s, %s)", (assoc_affil, assoc_dep, assoc_actv, assoc_main_accs, assoc_office_accs, assoc_djroom_accs, std_id))
+
+        # Insert into Personal_info
+        cursor.execute("INSERT INTO Personal_info (FirstName, LastName, eMail, GSM, BDay, Std_ID) VALUES(%s, %s, %s, %s, %s, %s)", (first_name, last_name, email, gsm, bday, std_id))
+
+        conn.commit()
+        conn.close()
+
+        # Clear the form fields
+        std_id_entry.delete(0, tk.END)
+        std_dep_entry.delete(0, tk.END)
+        std_term_entry.delete(0, tk.END)
+        assoc_dep_entry.delete(0, tk.END)
+        first_name_entry.delete(0, tk.END)
+        last_name_entry.delete(0, tk.END)
+        email_entry.delete(0, tk.END)
+        gsm_entry.delete(0, tk.END)
+        bday_entry.delete(0, tk.END)
+        uid_var.set("")  # Clear the UID variable
+
+        # Show a success message
+        messagebox.showinfo("Success", "Record added successfully!")
+
+    except pymysql.MySQLError as e:
+        # Display the error message
+        messagebox.showerror("Error", f"Could not insert into database: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+    print("UID received from serial communication: ", uid)
+
+
+# Function to refresh the form    
+
+root = tk.Tk()
+root.title("Student Information Form")
+create_form().pack(fill=tk.BOTH, expand=True)
+root.mainloop()
+```
+main.py:
+```
+from dotenv import load_dotenv
+import os
+import pymysql
+from pymysql.err import OperationalError
+import tkinter as tk
+from tkinter import ttk
+from lookup_tab import LookupTab
+import serial_communication
+import add_tab
+from database_operations import DatabaseOperations
+
+# Load the environment variables from the .env file
+load_dotenv()
+
+# Set up the database connection
+db_host = os.getenv('DB_HOST')
+db_user = os.getenv('DB_USER')
+db_password = os.getenv('DB_PASSWORD')
+db_database = os.getenv('DB_DATABASE')
+
+# Create an instance of the SerialCommunication class
+serial_communication = serial_communication.SerialCommunication('/dev/ttyUSB0', 9600)
+
+# Create the DatabaseOperations object
+db_operations = DatabaseOperations(db_host, db_user, db_password, db_database)
+
+# Connect to the database
+try:
+    db_operations.connect()
+except OperationalError as e:
+    print(f"An error occurred: {e}")
+    tk.messagebox.showerror("Error", f"An error occurred: {e}")
+    exit(1)
+
+# Create the main window
+root = tk.Tk()
+root.title("Student Information System")
+
+# Create the main notebook
+main_notebook = ttk.Notebook(root)
+main_notebook.pack(pady=10)
+
+# Create the add tab with the serial_communication instance
+add_tab = add_tab.AddTab(main_notebook, db_operations, serial_communication)
+
+# Create the lookup tab
+lookup_tab = LookupTab(main_notebook, db_operations)
+
+# Add the tabs to the notebook
+main_notebook.add(lookup_tab, text="Lookup")
+main_notebook.add(add_tab, text="Add")
+
+# Start the main event loop
+root.mainloop()
+
+# Disconnect from the database
+db_operations.disconnect()
+```
+
+
+
+And merge with:
+```
+import pymysql
+from pymysql.err import OperationalError
+import tkinter as tk
+from tkinter import ttk
+import serial
+
+class DatabaseOperations:
+    def __init__(self, host, user, password, database):
+        self.host = host
+        self.user = user
+        self.password = password
+        self.database = database
+        self.connection = None
+
+    def connect(self):
+        try:
+            self.connection = pymysql.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                db=self.database,
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            print("Database connection successful.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def disconnect(self):
+        if self.connection:
+            self.connection.close()
+            self.connection = None
+            print("Database connection closed.")
+        else:
+            print("No database connection to close.")
+
+    def execute_query(self, query, data=None):
+        try:
+            with self.connection.cursor() as cursor:
+                if data:
+                    cursor.execute(query, data)
+                else:
+                    cursor.execute(query)
+                self.connection.commit()
+                print("Query executed successfully.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def fetch_data(self, query, data=None):
+        try:
+            with self.connection.cursor() as cursor:
+                if data:
+                    cursor.execute(query, data)
+                else:
+                    cursor.execute(query)
+                result = cursor.fetchall()
+                return result
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+    def create_tables(self):
+        if not self.connection or not self.connection.open:
+            print("The database connection was not successful. Please check your connection settings.")
+            return
+
+        create_school_info_table = """
+        CREATE TABLE IF NOT EXISTS School_info (
+            Std_ID INT PRIMARY KEY,
+            Std_Dep VARCHAR(255),
+            Std_Term VARCHAR(255),
+            UID INT
+        );
+        """
+        create_assoc_info_table = """
+        CREATE TABLE IF NOT EXISTS Assoc_info (
+            Assoc_Affil BOOLEAN,
+            Assoc_Dep VARCHAR(255),
+            Assoc_Actv BOOLEAN,
+            Assoc_main_Accs BOOLEAN,
+            Assoc_office_Accs BOOLEAN,
+            Assoc_djroom_Accs BOOLEAN,
+            Std_ID INT,
+            PRIMARY KEY (Std_ID),
+            FOREIGN KEY (Std_ID) REFERENCES School_info(Std_ID)
+        );
+        """
+        create_personal_info_table = """
+        CREATE TABLE IF NOT EXISTS Personal_info (
+            FirstName VARCHAR(255),
+            LastName VARCHAR(255),
+            eMail VARCHAR(255),
+            GSM VARCHAR(255),
+            BDay DATE,
+            Std_ID INT,
+            PRIMARY KEY (Std_ID),
+            FOREIGN KEY (Std_ID) REFERENCES School_info(Std_ID)
+        );
+        """
+
+        try:
+            with self.connection.cursor() as cursor:
+                cursor.execute(create_school_info_table)
+                cursor.execute(create_assoc_info_table)
+                cursor.execute(create_personal_info_table)
+                self.connection.commit()
+                print("Tables created successfully.")
+        except OperationalError as e:
+            print(f"The error '{e}' occurred")
+
+class SerialCommunication:
+    def __init__(self, port, baudrate):
+        self.port = port
+        self.baudrate = baudrate
+        self.ser = None
+
+    def connect(self):
+        try:
+            self.ser = serial.Serial(self.port, self.baudrate, timeout=1)
+            print(f"Connected to serial port {self.port} at {self.baudrate} baud")
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def disconnect(self):
+        if self.ser:
+            self.ser.close()
+            print(f"Disconnected from serial port {self.port}")
+        else:
+            print("No serial port to disconnect from.")
+
+    def send_data(self, data):
+        try:
+            if self.ser:
+                self.ser.write(data.encode())
+                print(f"Data sent: {data}")
+            else:
+                print("No serial port to send data to.")
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def receive_data(self, timeout=1):
+        try:
+            if self.ser:
+                self.ser.timeout = timeout
+                data = self.ser.readline().decode().strip()
+                return data
+            else:
+                return None
+        except serial.SerialException as e:
+            print(f"The error '{e}' occurred")
+
+    def read_data_until(self, expected_data, timeout=1):
+        if self.ser:
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                data = self.receive_data()
+                if data == expected_data:
+                    return data
+            return None
+        else:
+            return None
+
+def recieve_uid(ser):
+    global uid
+    global doorName
+    while True:
+        data = ser.read_data_until(None, timeout=1)
+        if data:
+            uid, doorName = data.split(',')
+            if uid:
+                break
+
+class LookupTab(tk.Frame):
+    def __init__(self, parent, db_operations, serial_communication):
+        super().__init__(parent)
+        self.db_operations = db_operations
+        self.serial_communication = serial_communication
+        self.create_widgets()
+
+    def init_ui(self):
+        # Create UI elements
+
+class AddTab:
+    def __init__(self, parent, db_operations, serial_communication):
+        self.parent = parent
+        self.db_operations = db_operations
+        self.serial_communication = serial_communication
+
+        self.create_form()
+
+    def create_form(self):
+        # Create form elements
+
+def create_form():
+    # Create the form
+
+def submit_form(std_id_entry, std_dep_entry, std_term_entry, assoc_affil_var, assoc_dep_entry, assoc_actv_var, assoc_main_accs_var, assoc_office_accs_var, assoc_djroom_accs_var, first_name_entry, last_name_entry, email_entry, gsm_entry, bday_entry, uid_var,
+serial_communication):
+    # Get input values and submit form
+
+root = tk.Tk()
+root.title("Student Information Form")
+create_form().pack(fill=tk.BOTH, expand=True)
+root.mainloop()
+```
